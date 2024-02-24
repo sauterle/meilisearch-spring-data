@@ -23,7 +23,7 @@ internal class MeiliSearchRepositoryTest {
     }
 
     @Container
-    private var meilisearchDB: GenericContainer<*> = GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.2.0"))
+    private var meilisearchDB: GenericContainer<*> = GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.6.2"))
         .withExposedPorts(7700).withEnv("MEILI_MASTER_KEY", API_KEY)
 
     private val privateKey = API_KEY

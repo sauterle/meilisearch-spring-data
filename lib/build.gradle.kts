@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation("com.meilisearch.sdk:meilisearch-java:0.11.2")
+    implementation("com.meilisearch.sdk:meilisearch-java:0.11.7")
     implementation("org.springframework.data:spring-data-commons:3.2.3")
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
