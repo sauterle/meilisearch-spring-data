@@ -12,6 +12,7 @@ import com.meilisearch.sdk.json.JacksonJsonHandler
 import com.meilisearch.sdk.model.DocumentsQuery
 import com.meilisearch.sdk.model.TaskInfo
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.CrudRepository
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.util.*
@@ -25,7 +26,7 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     private val synchronous: Boolean,
     private val chunkSize: Int,
     index: String
-) : SearchDbRepository<T, ID> {
+) : CrudRepository<T, ID> {
     companion object {
         const val PRIMARY_KEY = "id"
         const val LIMITS = 100000
