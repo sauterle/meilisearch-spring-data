@@ -1,33 +1,50 @@
 package com.meilisearch.sdk.repository
 
-import com.google.common.collect.Lists
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.test.util.AssertionErrors
 import org.springframework.test.util.ReflectionTestUtils
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.utility.DockerImageName
 import java.util.*
 
 data class DummyEntity(val id: String, var field: String)
 
+@Testcontainers
 internal class MeiliSearchRepositoryTest {
 
-    companion object{
+    companion object {
         const val WRONG_ID = "wrong_id"
+        const val API_KEY = "123"
     }
 
-    private val meiliSearchUrl = "http://localhost:7700"
+    @Container
+    private var meilisearchDB: GenericContainer<*> = GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.2.0"))
+        .withExposedPorts(7700).withEnv("MEILI_MASTER_KEY", API_KEY)
 
-    private val privateKey = "<TODO>"
+    private val privateKey = API_KEY
 
     private val entity = DummyEntity(UUID.randomUUID().toString(), "a value")
 
-    private val meiliSearchRepository: MeiliSearchRepository<DummyEntity, String> =
-        object: MeiliSearchRepository<DummyEntity, String>(ObjectMapperTestConfig().objectMapper(), meiliSearchUrl, privateKey, true, "unit-test"){}
+    private lateinit var meiliSearchRepository: MeiliSearchRepository<DummyEntity, String>
 
     @BeforeEach
     fun setUp() {
+        val meiliSearchUrl = "http://${meilisearchDB.getHost()}:${meilisearchDB.getFirstMappedPort()}"
+
+        meiliSearchRepository = object : MeiliSearchRepository<DummyEntity, String>(
+            ObjectMapperTestConfig().objectMapper(),
+            meiliSearchUrl,
+            privateKey,
+            true,
+            500,
+            "unit-test"
+        ) {}
+
         ReflectionTestUtils.setField(meiliSearchRepository, "synchronous", true)
         meiliSearchRepository.save(entity)
     }
@@ -40,8 +57,9 @@ internal class MeiliSearchRepositoryTest {
     @Test
     fun testFindAll() {
         val all: Iterable<DummyEntity> = meiliSearchRepository.findAll()
-        assertFalse(Lists.newArrayList(all).isEmpty())
-        assertEntityIsExpectedType(Lists.newArrayList(all).stream().findFirst().orElseThrow())
+
+        assertFalse(all.toList().isEmpty())
+        assertEntityIsExpectedType(all.toList().stream().findFirst().orElseThrow())
     }
 
     @Test
@@ -56,7 +74,7 @@ internal class MeiliSearchRepositoryTest {
         meiliSearchRepository.save(entity)
         val all: Iterable<DummyEntity> = meiliSearchRepository.findAll()
         val next = all.iterator().next()
-        val dummyEntities = Lists.newArrayList(all)
+        val dummyEntities = all.toList()
         assertEquals(1, dummyEntities.size)
         assertEquals("changed", next.field)
     }
@@ -99,9 +117,9 @@ internal class MeiliSearchRepositoryTest {
     @Test
     fun testFindAllById() {
         val found: Iterable<DummyEntity> = meiliSearchRepository.findAllById(mutableListOf(entity.id, WRONG_ID))
-        assertFalse(Lists.newArrayList(found).isEmpty())
-        assertEquals(1, Lists.newArrayList(found).size)
-        assertEntityIsExpectedType(Lists.newArrayList(found).stream().findAny().orElseThrow())
+        assertFalse(found.toList().isEmpty())
+        assertEquals(1, found.toList().size)
+        assertEntityIsExpectedType(found.toList().stream().findAny().orElseThrow())
     }
 
     @Test

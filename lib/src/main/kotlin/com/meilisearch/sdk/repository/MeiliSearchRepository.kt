@@ -3,7 +3,14 @@ package com.meilisearch.sdk.repository
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.JavaType
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.meilisearch.sdk.*
+import com.meilisearch.sdk.Client
+import com.meilisearch.sdk.Config
+import com.meilisearch.sdk.Index
+import com.meilisearch.sdk.SearchRequest
+
+import com.meilisearch.sdk.json.JacksonJsonHandler
+import com.meilisearch.sdk.model.DocumentsQuery
+import com.meilisearch.sdk.model.TaskInfo
 import org.slf4j.LoggerFactory
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
@@ -11,11 +18,12 @@ import java.util.*
 
 data class UpdateResponse(val updateId: Int)
 
-abstract class MeiliSearchRepository<T, ID>(
+abstract class MeiliSearchRepository<T : Any, ID : Any>(
     private val objectMapper: ObjectMapper,
     meiliSearchUrl: String,
     privateKey: String,
     private val synchronous: Boolean,
+    private val chunkSize: Int,
     index: String
 ) : SearchDbRepository<T, ID> {
     companion object {
@@ -24,20 +32,20 @@ abstract class MeiliSearchRepository<T, ID>(
     }
 
     private val log = LoggerFactory.getLogger(javaClass)
-    private val client: Client = Client(Config(meiliSearchUrl, privateKey))
+    private val client: Client = Client(Config(meiliSearchUrl, privateKey, JacksonJsonHandler(objectMapper)))
     protected val index = getOrCreateIndex(index)
 
     private fun getOrCreateIndex(indexUid: String): Index {
         return try {
-            client.indexList.find { it.uid == indexUid } ?: createIndex(indexUid)
+            client.indexes.results.find { it.uid == indexUid } ?: createIndex(indexUid)
         } catch (e: java.lang.Exception) {
             throw IllegalStateException(e)
         }
     }
 
     private fun createIndex(indexUid: String): Index {
-        val createIndexTask: Task = client.createIndex(indexUid, PRIMARY_KEY)
-        client.waitForTask(createIndexTask.uid)
+        val createIndexTask: TaskInfo = client.createIndex(indexUid, PRIMARY_KEY)
+        client.waitForTask(createIndexTask.taskUid)
         return client.getIndex(indexUid)
     }
 
@@ -46,8 +54,11 @@ abstract class MeiliSearchRepository<T, ID>(
     }
 
     override fun <S : T> saveAll(entities: MutableIterable<S>): MutableIterable<S> {
-        val documents: String = serialize<S>(entities)
-        save(documents)
+        val chunkedEntities: List<List<S>> = entities.chunked(chunkSize)
+        chunkedEntities.forEach { chunk ->
+            val documents: String = serialize(chunk)
+            save(documents)
+        }
         return entities
     }
 
@@ -61,7 +72,7 @@ abstract class MeiliSearchRepository<T, ID>(
 
     private fun save(documents: String) {
         try {
-            val updateTask: Task = index.updateDocuments(documents, PRIMARY_KEY)
+            val updateTask: TaskInfo = index.updateDocuments(documents, PRIMARY_KEY)
             if (synchronous) {
                 waitAndAnalyze(updateTask)
             }
@@ -70,12 +81,12 @@ abstract class MeiliSearchRepository<T, ID>(
         }
     }
 
-    private fun waitAndAnalyze(task: Task) {
+    private fun waitAndAnalyze(task: TaskInfo) {
         try {
-            client.tasksHandler.waitForTask(task.uid, 180000, 500);
-            val task = client.getTask(task.uid)
-            if (task.error != null) {
-                throw IllegalStateException("error code: '${task.error.taskErrorCode}' - error type: '${task.error.taskErrorType}' - error link: '${task.error.taskErrorLink}'")
+            index.waitForTask(task.taskUid, 180000, 500)
+            val clientTask = client.getTask(task.taskUid)
+            if (clientTask.error != null) {
+                throw IllegalStateException("error code: '${clientTask.error.taskErrorCode}' - error type: '${clientTask.error.taskErrorType}' - error link: '${clientTask.error.taskErrorLink}'")
             }
         } catch (e: Exception) {
             throw IllegalStateException(e)
@@ -87,10 +98,13 @@ abstract class MeiliSearchRepository<T, ID>(
         return objectMapper.readValue(updateResponse, UpdateResponse::class.java)
     }
 
+    private fun <T : Any> Optional<out T>.toJOptional(): Optional<T> =
+        if (isPresent) Optional.of(get()) else Optional.empty()
+
     override fun findById(id: ID): Optional<T> {
         return try {
-            val document = index.getDocument(id.toString())
-            Optional.ofNullable(deserializeOne(document))
+            val document = index.getDocument(id.toString(), getGenericClass())
+            Optional.ofNullable(document as T?)
         } catch (e: java.lang.Exception) {
             log.warn("Could not find by id...", e)
             Optional.empty()
@@ -113,21 +127,21 @@ abstract class MeiliSearchRepository<T, ID>(
 
     override fun existsById(id: ID): Boolean {
         return try {
-            val document = index.getDocument(id.toString())
-            Optional.ofNullable(deserializeOne(document)).isPresent
+            val document = index.getDocument(id.toString(), getGenericClass())
+            Optional.ofNullable(document).isPresent
         } catch (e: java.lang.Exception) {
             false
         }
     }
 
     override fun findAll(): List<T> {
-        val documents: String = findAllDocuments()
-        return deserialize(documents)
+        val results = index.getDocuments(DocumentsQuery().setLimit(LIMITS), getGenericClass())
+        return results.results.map { it as T }.toList()
     }
 
     private fun findAllDocuments(): String {
         return try {
-            index.getDocuments(LIMITS)
+            index.getRawDocuments(DocumentsQuery().setLimit(LIMITS))
         } catch (e: java.lang.Exception) {
             throw IllegalStateException(e)
         }
@@ -162,9 +176,8 @@ abstract class MeiliSearchRepository<T, ID>(
 
     override fun count(): Long {
         return try {
-            val searchRequest = SearchRequest()
-            val search = index.search(searchRequest)
-            search.nbHits.toLong()
+            val search = index.search(SearchRequest.builder().build())
+            search.hits.size.toLong()
         } catch (e: java.lang.Exception) {
             throw IllegalStateException(e)
         }
@@ -172,7 +185,7 @@ abstract class MeiliSearchRepository<T, ID>(
 
     override fun deleteById(id: ID) {
         try {
-            val deleteTask: Task = index.deleteDocument(id.toString())
+            val deleteTask: TaskInfo = index.deleteDocument(id.toString())
             if (synchronous) {
                 waitAndAnalyze(deleteTask)
             }
@@ -195,7 +208,7 @@ abstract class MeiliSearchRepository<T, ID>(
 
     override fun deleteAll() {
         try {
-            val deleteTask: Task = index.deleteAllDocuments()
+            val deleteTask: TaskInfo = index.deleteAllDocuments()
             if (synchronous) {
                 waitAndAnalyze(deleteTask)
             }

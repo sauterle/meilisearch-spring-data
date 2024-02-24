@@ -8,7 +8,7 @@
 
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
-    id("org.jetbrains.kotlin.jvm") version "1.7.10"
+    id("org.jetbrains.kotlin.jvm") version "1.9.22"
 
     // Apply the java-library plugin for API and implementation separation.
     `java-library`
@@ -21,21 +21,21 @@ repositories {
 
 dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation("com.meilisearch.sdk:meilisearch-java:0.7.2")
-    implementation("org.springframework.data:spring-data-commons:3.0.1")
+    implementation("com.meilisearch.sdk:meilisearch-java:0.11.2")
+    implementation("org.springframework.data:spring-data-commons:3.2.3")
+
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.16.1")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")
 
     // Use the Kotlin JUnit 5 integration.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-
     // Use the JUnit 5 integration.
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
+    testImplementation("org.testcontainers:testcontainers:1.19.6")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.6")
 
-    testImplementation("org.springframework:spring-test:6.0.4")
-    testImplementation("com.google.guava:guava:31.1-jre")
-    testImplementation("org.testcontainers:testcontainers:1.17.6") // Not yet used, but planned for the future
-    testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
-    testImplementation("com.fasterxml.jackson.core:jackson-core:2.14.2")
-    testImplementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
+    testImplementation("org.springframework:spring-test:6.1.4")
 
 }
 
