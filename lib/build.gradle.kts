@@ -12,6 +12,19 @@ plugins {
 
     // Apply the java-library plugin for API and implementation separation.
     `java-library`
+    `maven-publish`
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "com.meilisearch.sdk"
+            artifactId = "meilisearch-spring-data"
+            version = "0.0.1"
+
+            from(components["java"])
+        }
+    }
 }
 
 repositories {
