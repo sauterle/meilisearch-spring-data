@@ -33,8 +33,10 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     }
 
     private val log = LoggerFactory.getLogger(javaClass)
+
     private val client: Client =
         Client(CustomMeiliConfig(Config(meiliSearchUrl, privateKey, JacksonJsonHandler(objectMapper))).alteredConfig)
+
     protected val index = getOrCreateIndex(index)
 
     private fun getOrCreateIndex(indexUid: String): Index {
