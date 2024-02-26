@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.test.util.AssertionErrors
-import org.springframework.test.util.ReflectionTestUtils
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -23,8 +22,9 @@ internal class MeiliSearchRepositoryTest {
     }
 
     @Container
-    private var meilisearchDB: GenericContainer<*> = GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.6.2"))
-        .withExposedPorts(7700).withEnv("MEILI_MASTER_KEY", API_KEY)
+    private var meilisearchDB: GenericContainer<*> =
+        GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.6.2"))
+            .withExposedPorts(7700).withEnv("MEILI_MASTER_KEY", API_KEY)
 
     private val privateKey = API_KEY
 
@@ -36,16 +36,14 @@ internal class MeiliSearchRepositoryTest {
     fun setUp() {
         val meiliSearchUrl = "http://${meilisearchDB.getHost()}:${meilisearchDB.getFirstMappedPort()}"
 
+        val config = Config(meiliSearchUrl, privateKey, true, 500)
+
         meiliSearchRepository = object : MeiliSearchRepository<DummyEntity, String>(
+            config,
             ObjectMapperTestConfig().objectMapper(),
-            meiliSearchUrl,
-            privateKey,
-            true,
-            500,
             "unit-test"
         ) {}
 
-        ReflectionTestUtils.setField(meiliSearchRepository, "synchronous", true)
         meiliSearchRepository.save(entity)
     }
 

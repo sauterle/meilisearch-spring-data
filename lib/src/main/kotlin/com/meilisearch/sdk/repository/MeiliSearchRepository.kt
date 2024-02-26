@@ -4,11 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.JavaType
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.meilisearch.sdk.Client
-import com.meilisearch.sdk.Config
 import com.meilisearch.sdk.Index
 import com.meilisearch.sdk.SearchRequest
-
 import com.meilisearch.sdk.json.JacksonJsonHandler
+import com.meilisearch.sdk.json.JsonHandler
 import com.meilisearch.sdk.model.DocumentsQuery
 import com.meilisearch.sdk.model.TaskInfo
 import org.slf4j.LoggerFactory
@@ -16,15 +15,22 @@ import org.springframework.data.repository.CrudRepository
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.util.*
+import com.meilisearch.sdk.Config as MeiliConfig
+
+
+data class Config(
+    private val meiliSearchUrl: String,
+    private val apiKey: String? = "",
+    val synchronous: Boolean = true,
+    val chunkSize: Int = 500
+) :
+    MeiliConfig(meiliSearchUrl, apiKey)
 
 data class UpdateResponse(val updateId: Int)
 
 abstract class MeiliSearchRepository<T : Any, ID : Any>(
+    private val config: Config,
     private val objectMapper: ObjectMapper,
-    meiliSearchUrl: String,
-    privateKey: String,
-    private val synchronous: Boolean,
-    private val chunkSize: Int,
     index: String
 ) : CrudRepository<T, ID> {
     companion object {
@@ -32,8 +38,14 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
         const val LIMITS = 100000
     }
 
+    init {
+        config.jsonHandler = JacksonJsonHandler(objectMapper)
+    }
+
     private val log = LoggerFactory.getLogger(javaClass)
-    private val client: Client = Client(Config(meiliSearchUrl, privateKey, JacksonJsonHandler(objectMapper)))
+
+    private val client: Client = Client(config)
+
     protected val index = getOrCreateIndex(index)
 
     private fun getOrCreateIndex(indexUid: String): Index {
@@ -55,7 +67,7 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     }
 
     override fun <S : T> saveAll(entities: MutableIterable<S>): MutableIterable<S> {
-        val chunkedEntities: List<List<S>> = entities.chunked(chunkSize)
+        val chunkedEntities: List<List<S>> = entities.chunked(config.chunkSize)
         chunkedEntities.forEach { chunk ->
             val documents: String = serialize(chunk)
             save(documents)
@@ -74,7 +86,7 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     private fun save(documents: String) {
         try {
             val updateTask: TaskInfo = index.updateDocuments(documents, PRIMARY_KEY)
-            if (synchronous) {
+            if (config.synchronous) {
                 waitAndAnalyze(updateTask)
             }
         } catch (e: Exception) {
@@ -187,7 +199,7 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     override fun deleteById(id: ID) {
         try {
             val deleteTask: TaskInfo = index.deleteDocument(id.toString())
-            if (synchronous) {
+            if (config.synchronous) {
                 waitAndAnalyze(deleteTask)
             }
         } catch (e: java.lang.Exception) {
@@ -210,7 +222,7 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     override fun deleteAll() {
         try {
             val deleteTask: TaskInfo = index.deleteAllDocuments()
-            if (synchronous) {
+            if (config.synchronous) {
                 waitAndAnalyze(deleteTask)
             }
         } catch (e: Exception) {

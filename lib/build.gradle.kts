@@ -27,6 +27,10 @@ publishing {
     }
 }
 
+java {
+    withSourcesJar()
+}
+
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
@@ -34,7 +38,7 @@ repositories {
 
 dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation("com.meilisearch.sdk:meilisearch-java:0.11.7")
+    api("com.meilisearch.sdk:meilisearch-java:0.11.7")
     implementation("org.springframework.data:spring-data-commons:3.2.3")
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
@@ -45,7 +49,11 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     // Use the JUnit 5 integration.
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
-    testImplementation("org.testcontainers:testcontainers:1.19.6")
+    testImplementation("org.testcontainers:testcontainers:1.19.6") {
+        exclude(group = "org.apache.commons", module = "commons-compress")
+    }
+    // Set commons-compress version manually, as vulnerabilities exist in < 1.26
+    testImplementation("org.apache.commons:commons-compress:1.26.0")
     testImplementation("org.testcontainers:junit-jupiter:1.19.6")
 
     testImplementation("org.springframework:spring-test:6.1.4")
