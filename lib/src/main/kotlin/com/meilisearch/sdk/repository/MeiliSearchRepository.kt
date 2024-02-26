@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.meilisearch.sdk.Client
 import com.meilisearch.sdk.Index
 import com.meilisearch.sdk.SearchRequest
+import com.meilisearch.sdk.json.JacksonJsonHandler
+import com.meilisearch.sdk.json.JsonHandler
 import com.meilisearch.sdk.model.DocumentsQuery
 import com.meilisearch.sdk.model.TaskInfo
 import org.slf4j.LoggerFactory
@@ -34,6 +36,10 @@ abstract class MeiliSearchRepository<T : Any, ID : Any>(
     companion object {
         const val PRIMARY_KEY = "id"
         const val LIMITS = 100000
+    }
+
+    init {
+        config.jsonHandler = JacksonJsonHandler(objectMapper)
     }
 
     private val log = LoggerFactory.getLogger(javaClass)
