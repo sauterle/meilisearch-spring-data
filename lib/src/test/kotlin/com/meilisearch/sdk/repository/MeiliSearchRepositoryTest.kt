@@ -19,24 +19,24 @@ internal class MeiliSearchRepositoryTest {
     companion object {
         const val WRONG_ID = "wrong_id"
         const val API_KEY = "123"
+
+        @Container
+        private var meilisearchDB: GenericContainer<*> =
+            GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.6.2"))
+                .withExposedPorts(7700).withEnv("MEILI_MASTER_KEY", API_KEY)
     }
 
-    @Container
-    private var meilisearchDB: GenericContainer<*> =
-        GenericContainer(DockerImageName.parse("getmeili/meilisearch:v1.6.2"))
-            .withExposedPorts(7700).withEnv("MEILI_MASTER_KEY", API_KEY)
-
-    private val privateKey = API_KEY
 
     private val entity = DummyEntity(UUID.randomUUID().toString(), "a value")
 
     private lateinit var meiliSearchRepository: MeiliSearchRepository<DummyEntity, String>
 
+
     @BeforeEach
     fun setUp() {
         val meiliSearchUrl = "http://${meilisearchDB.getHost()}:${meilisearchDB.getFirstMappedPort()}"
 
-        val config = Config(meiliSearchUrl, privateKey, true, 500)
+        val config = Config(meiliSearchUrl, API_KEY, true, 500)
 
         meiliSearchRepository = object : MeiliSearchRepository<DummyEntity, String>(
             config,
